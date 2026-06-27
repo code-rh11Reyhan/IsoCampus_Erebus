@@ -24,7 +24,7 @@ I'm also putting this project on GitHub so I stay consistent and actually finish
 
 - [x] Basic isometric projection
 - [x] Camera movement
-- [x] Zoom
+- [ ] Zoom
 - [ ] Tile rendering
 - [ ] Asset creation
 - [ ] Buildings
