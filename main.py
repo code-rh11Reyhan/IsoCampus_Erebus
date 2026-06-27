@@ -10,21 +10,29 @@ display  = pygame.Surface((300, 300))
 # All Images Are Gonna Be Mentioned Here Only
 
 grass_img = pygame.image.load('images/grass.png').convert()
-
+tree_img = pygame.image.load('images/tree2.png').convert()
+track_grass = pygame.image.load('images/track_grass.png').convert()
 
 
 
 # Setting every color key at once
 grass_img.set_colorkey((0, 0, 0))
+tree_img.set_colorkey((0, 0, 0))
+track_grass.set_colorkey((0, 0, 0))
 
 
 
-
-f = open('map.txt')
-
-map_data = [[int(c) for c in row] for row in f.read().split('\n')]
+f = open('maps/grass_map.txt')
+grass_data = [[int(c) for c in row] for row in f.read().split('\n')]
 f.close()
 
+f = open('maps/tree_map.txt')
+tree_data = [[int(c) for c in row] for row in f.read().split('\n')]
+f.close()
+
+f = open('maps/track_grass.txt')
+track_grass_data = [[int(c) for c in row] for row in f.read().split('\n')]
+f.close()
 
 # Game Variables
 running = True
@@ -40,15 +48,19 @@ clock = pygame.time.Clock()
 
 while running:
 
-    display.fill((0, 0, 0))
+    display.fill((30, 30, 30))
 
-    for y, row in enumerate(map_data):
+    for y, row in enumerate(grass_data):
         for x, tile in enumerate(row):
             if tile:
                 pygame.draw.rect(display, (255, 255, 255), pygame.Rect(x*2, y*2, 3, 3), 1)
+                display.blit(grass_img, (camera_x + x*10 - y*10, camera_y+ x*5+ y*5+14))
                 display.blit(grass_img, (camera_x+ x*10 - y*10, camera_y+ x*5+ y*5))
-                display.blit(grass_img, (camera_x + x*10 - y*10, camera_y+ x*5+ y*5-14))
                 
+            if tree_data[y][x]:
+                display.blit(tree_img, (camera_x + x*10- y*10, camera_y + x*5+ y*5 - 16))
+            if track_grass_data[y][x]:
+                display.blit(track_grass, (camera_x + x*10- y*10, camera_y + x*5+ y*5 - 16))
                 
             
 
