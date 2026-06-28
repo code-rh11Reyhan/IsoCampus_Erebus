@@ -12,6 +12,9 @@ display  = pygame.Surface((300, 300))
 grass_img = pygame.image.load('images/grass.png').convert()
 tree_img = pygame.image.load('images/tree2.png').convert()
 track_grass = pygame.image.load('images/track_grass.png').convert()
+dirt_grass = pygame.image.load('images/grass2.png').convert()
+cement_img = pygame.image.load('images/cement.png').convert()
+
 
 
 
@@ -19,6 +22,8 @@ track_grass = pygame.image.load('images/track_grass.png').convert()
 grass_img.set_colorkey((0, 0, 0))
 tree_img.set_colorkey((0, 0, 0))
 track_grass.set_colorkey((0, 0, 0))
+dirt_grass.set_colorkey((0, 0, 0))
+cement_img.set_colorkey((0, 0, 0))
 
 
 
@@ -33,6 +38,16 @@ f.close()
 f = open('maps/track_grass.txt')
 track_grass_data = [[int(c) for c in row] for row in f.read().split('\n')]
 f.close()
+
+f = open('maps/dirt_grass.txt')
+dirt_grass_data = [[int(c) for c in row] for row in f.read().split('\n')]
+f.close()
+
+f = open('maps/cement_map.txt')
+cement_data = [[int(c) for c in row] for row in f.read().split('\n')]
+f.close()
+
+
 
 # Game Variables
 running = True
@@ -61,6 +76,10 @@ while running:
                 display.blit(tree_img, (camera_x + x*10- y*10, camera_y + x*5+ y*5 - 16))
             if track_grass_data[y][x]:
                 display.blit(track_grass, (camera_x + x*10- y*10, camera_y + x*5+ y*5 - 16))
+            if dirt_grass_data[y][x]:
+                display.blit(dirt_grass, (camera_x+x*10-y*10, camera_y + x*5 + y*5))
+            if cement_data[y][x]:
+                display.blit(cement_img, (camera_x + x*10 - y*10, camera_y+x*5+y*5))
                 
             
 
