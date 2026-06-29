@@ -284,7 +284,7 @@ def button_hit(pos):
 
 running = True
 while running:
-    screen.fill((20, 20, 24))
+    screen.fill((20, 20, 20))
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
