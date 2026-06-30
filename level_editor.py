@@ -6,23 +6,32 @@ pygame.init()
 
 
 TILES = [
-    {"name": "grass",       "image": "images/grass.png",      "map_file": "maps/grass_map.txt"},
-    {"name": "dirt_grass",  "image": "images/grass2.png",      "map_file": "maps/dirt_grass.txt"},
-    {"name": "track_grass", "image": "images/track_grass.png", "map_file": "maps/track_grass.txt"},
-    {"name": "cement",      "image": "images/cement.png",      "map_file": "maps/cement_map.txt"},
-    {"name": "tree",        "image": "images/tree2.png",       "map_file": "maps/tree_map.txt"},
+    {"name": "grass",       "image": "images/grass.png",      "map_file": "maps/grass_map.txt",  "real_w": 20, "real_h": 24, "offset": 14},
+    {"name": "dirt_grass",  "image": "images/grass2.png",      "map_file": "maps/dirt_grass.txt", "real_w": 20, "real_h": 24, "offset": 15},
+    {"name": "track_grass", "image": "images/track_grass.png", "map_file": "maps/track_grass.txt","real_w": 20, "real_h": 24, "offset": 6},
+    {"name": "cement",      "image": "images/cement.png",      "map_file": "maps/cement_map.txt", "real_w": 19, "real_h": 24, "offset": 16},
+    {"name": "tree",        "image": "images/tree2.png",       "map_file": "maps/tree_map.txt",   "real_w": 20, "real_h": 24, "offset": 14},
 ]
+# Offsets above were measured directly from each PNG's actual pixel content (the height of the
+# constant-width "wall" band between the top face and the bottom edge) -- NOT assumed. A shared
+# guessed offset is exactly what caused unequal/staircased stacking before: each sprite's real
+# wall height differs by 1-2px, which compounds visibly across a multi-layer stack.
+#
+# track_grass and tree are NOT extruded blocks (no flat top + 4 walls) -- they're organic/standing
+# shapes, so "offset" for them means "how far to nudge each additional copy up" rather than a true
+# measured wall height, and stacking many copies of either may look visually odd even though the
+# numbers are geometrically consistent. That's an art/asset limitation, not a code bug.
 
 MARGIN = 20
 
-REAL_TILE_W, REAL_TILE_H = 20, 24
+# Canonical footprint, used ONLY for grid math (matrix, click-picking, cell spacing).
+# This must stay the same for every tile regardless of each sprite's own pixel size --
+# the grid itself is uniform even though individual sprites (like cement at 19px) aren't.
+REFERENCE_TILE_W = 20
 
 EDITOR_SCALE = 2
 
-SPRITE_W = REAL_TILE_W * EDITOR_SCALE
-SPRITE_H = REAL_TILE_H * EDITOR_SCALE
-
-TILE_W = SPRITE_W
+TILE_W = REFERENCE_TILE_W * EDITOR_SCALE
 TILE_H = TILE_W / 2
 HW, HH = TILE_W / 2, TILE_H / 2
 
@@ -87,7 +96,18 @@ font = pygame.font.SysFont("consolas", 14)
 for tile in TILES:
     img = pygame.image.load(tile["image"]).convert()
     img.set_colorkey((0, 0, 0))
-    tile["image_obj"] = pygame.transform.scale(img, (SPRITE_W, SPRITE_H))
+    # Each tile keeps its OWN pixel size scaled up -- fixes cement (19px wide) being
+    # force-squashed to match the others' 20px width.
+    sprite_w = tile["real_w"] * EDITOR_SCALE
+    sprite_h = tile["real_h"] * EDITOR_SCALE
+    tile["image_obj"] = pygame.transform.scale(img, (sprite_w, sprite_h))
+    tile["sprite_w"] = sprite_w
+    tile["sprite_h"] = sprite_h
+    # The offset was measured in real (unscaled) pixels -- it MUST be scaled by EDITOR_SCALE
+    # too, or stacks compress/sink at any zoom level other than 1x. This was the main bug.
+    tile["scaled_offset"] = tile["offset"] * EDITOR_SCALE
+
+MAX_SPRITE_H = max(tile["sprite_h"] for tile in TILES)  # generous bound, used only for view-culling
 
 selected_index = 0
 
@@ -180,7 +200,7 @@ def draw_grid():
 
             if sx + HW < 0 or sx - HW > vp_rect.right:
                 continue
-            if sy + SPRITE_H < 0 or sy > WINDOW_H:
+            if sy + MAX_SPRITE_H < 0 or sy > WINDOW_H:
                 continue
 
             top    = (sx,      sy)
@@ -189,16 +209,28 @@ def draw_grid():
             left   = (sx - HW, sy + HH)
             pygame.draw.polygon(screen, (60, 60, 65), [top, right, bottom, left], 1)
 
+            height_so_far = 0  # running stack height at this cell, in pixels, across ALL tile types so far
             for tile in TILES:
-                if tile["data"][gy][gx]:
-                    screen.blit(tile["image_obj"], (sx - HW, sy))
+                count = tile["data"][gy][gx]
+                if not count:
+                    continue
+                offset = tile["scaled_offset"]
+                sw = tile["sprite_w"]  # center each sprite on its OWN width, not the shared footprint
+                for level in range(count):
+                    y_off = height_so_far + level * offset
+                    screen.blit(tile["image_obj"], (sx - sw / 2, sy - y_off))
+                if count > 1:
+                    top_y = sy - (height_so_far + (count - 1) * offset)
+                    badge = font.render(str(count), True, (255, 230, 120))
+                    screen.blit(badge, (sx + HW - 10, top_y - 12))
+                height_so_far += count * offset
 
 
 def draw_palette():
     ox, oy = palette_origin
     icon_h = PALETTE_CELL
-    icon_w = round(icon_h * REAL_TILE_W / REAL_TILE_H)
     for i, tile in enumerate(TILES):
+        icon_w = round(icon_h * tile["real_w"] / tile["real_h"])
         rect = pygame.Rect(ox, oy + i * PALETTE_ITEM_H, PALETTE_CELL + 10, PALETTE_CELL + 10)
         is_selected = (i == selected_index)
         pygame.draw.rect(screen, (90, 90, 40) if is_selected else (45, 45, 50), rect)
@@ -348,11 +380,11 @@ while running:
 
             gx, gy = screen_to_grid(*event.pos)
             if 0 <= gx < GRID_COLS and 0 <= gy < GRID_ROWS:
-                if event.button == 1:
-                    TILES[selected_index]["data"][gy][gx] = 1
-                elif event.button == 3:
-                    for tile in TILES:
-                        tile["data"][gy][gx] = 0
+                cell = TILES[selected_index]["data"][gy][gx]
+                if event.button == 1:          # add one layer of the selected tile here
+                    TILES[selected_index]["data"][gy][gx] = min(cell + 1, 9)  # 9 = single-digit ceiling in the .txt format
+                elif event.button == 3:        # remove the top layer of the selected tile here
+                    TILES[selected_index]["data"][gy][gx] = max(cell - 1, 0)
 
     draw_grid()
     draw_palette()
@@ -362,7 +394,7 @@ while running:
     pygame.draw.line(screen, (50, 50, 55), (sep_x, 0), (sep_x, WINDOW_H))
 
     hint = font.render(
-        "Left: paint   Right: erase   Middle-drag: pan",
+        "Left: add layer   Right: remove layer   Middle-drag: pan",
         True, (160, 160, 160)
     )
     screen.blit(hint, (MARGIN, WINDOW_H - 20))
